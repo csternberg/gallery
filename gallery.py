@@ -251,19 +251,26 @@ def load_font(size: int):
         return ImageFont.load_default()
 
 
-def metadata_layout(total_x: int):
-    """Scale the -M metadata bar's font size/line height/padding with the gallery's
-    width, so text that was legible at ~300px doesn't shrink to unreadable on a
-    1000px+ wide gallery. 16px/22px/10px (the original fixed values) are the floor.
+METADATA_FONT_SIZE, METADATA_LINE_HEIGHT, METADATA_PAD = 16, 22, 10
+
+
+def metadata_layout(total_x: int, scale: bool = False):
+    """Font size/line height/padding for the -M metadata bar.
+
+    Fixed at 16px/22px/10px unless `scale` (-S) is set, in which case they grow
+    with the gallery's width so text that was legible at ~300px doesn't shrink
+    to unreadable on a 1000px+ wide gallery. The fixed values are the floor.
     """
-    font_size = max(16, round(total_x / 55))
+    if not scale:
+        return METADATA_FONT_SIZE, METADATA_LINE_HEIGHT, METADATA_PAD
+    font_size = max(METADATA_FONT_SIZE, round(total_x / 55))
     line_h = round(font_size * 1.4)
     pad = round(font_size * 0.6)
     return font_size, line_h, pad
 
 
 def make_gallery(thumbs: list, out_file: Path, total_x: int = None, total_y: int = None,
-                 metadata: dict = None, thumbs_dir: Path = None):
+                 metadata: dict = None, thumbs_dir: Path = None, scale_text: bool = False):
     """
     Combine thumbnails into a single gallery image (optional metadata bar).
     If `thumbs_dir` is given, the resized individual thumbnails are saved there.
@@ -299,7 +306,7 @@ def make_gallery(thumbs: list, out_file: Path, total_x: int = None, total_y: int
         # Metadata bar
         text_lines, font, line_h, pad, meta_height = [], None, 0, 10, 0
         if metadata:
-            font_size, line_h, pad = metadata_layout(total_x)
+            font_size, line_h, pad = metadata_layout(total_x, scale=scale_text)
             font = load_font(font_size)
             text_lines = [
                 f"Filename: {metadata['filename']}",
@@ -384,6 +391,9 @@ def main():
     parser.add_argument("-Y", "-y", type=positive_int, help="Total vertical pixels (optional)")
     parser.add_argument("-F", "-f", action="store_true", help="Also save individual thumbnails in a folder")
     parser.add_argument("-M", "-m", action="store_true", help="Add metadata bar above gallery")
+    parser.add_argument("-S", "-s", action="store_true",
+                        help="Scale the -M metadata text size with gallery width, so it stays readable "
+                             "on wide galleries (requires -M; no effect without it)")
     parser.add_argument("-O", "-o", "--output", metavar="DIR",
                         help="Save galleries and thumbnails in DIR instead of next to each source file")
     parser.add_argument("-L", "-l", action="store_true",
@@ -394,6 +404,8 @@ def main():
                         help="Parallel ffmpeg processes per video (default: %(default)s)")
 
     args = parser.parse_args()
+    if args.S and not args.M:
+        parser.error("-S/-s requires -M/-m")
     check_prerequisites()
 
     out_dir = Path(args.output) if args.output else None
@@ -452,6 +464,7 @@ def main():
                     total_y=args.Y,
                     metadata=info["meta"] if args.M else None,
                     thumbs_dir=thumbs_dir,
+                    scale_text=args.S,
                 )
 
             if out is None:

@@ -111,6 +111,36 @@ def test_x_and_y_flags_control_final_gallery_size(media_dir, workdir):
         assert img.size == (200, 100)
 
 
+@requires_ffmpeg
+def test_scale_flag_requires_metadata_flag(media_dir, workdir):
+    copy_fixture(media_dir, "plain.mp4", workdir)
+    result = run_gallery(["-N", "2", "-S", "plain.mp4"], cwd=workdir)
+    assert result.returncode != 0
+    assert "-S" in (result.stdout + result.stderr)
+    assert "-M" in (result.stdout + result.stderr)
+
+
+@requires_ffmpeg
+def test_scale_flag_grows_metadata_header_on_wide_gallery(media_dir, workdir):
+    copy_fixture(media_dir, "plain.mp4", workdir, dest_name="unscaled.mp4")
+    copy_fixture(media_dir, "plain.mp4", workdir, dest_name="scaled.mp4")
+    r1 = run_gallery(["-N", "4", "-M", "-X", "1600", "unscaled.mp4"], cwd=workdir)
+    r2 = run_gallery(["-N", "4", "-M", "-S", "-X", "1600", "scaled.mp4"], cwd=workdir)
+    assert r1.returncode == 0, r1.stdout + r1.stderr
+    assert r2.returncode == 0, r2.stdout + r2.stderr
+    with Image.open(workdir / "unscaled_gallery.jpg") as a, Image.open(workdir / "scaled_gallery.jpg") as b:
+        assert a.size[0] == b.size[0] == 1600
+        assert b.size[1] > a.size[1]
+
+
+@requires_ffmpeg
+@pytest.mark.parametrize("flag", ["-s", "-S"])
+def test_scale_flag_is_case_insensitive(media_dir, workdir, flag):
+    copy_fixture(media_dir, "plain.mp4", workdir)
+    result = run_gallery(["-N", "2", "-M", flag, "plain.mp4"], cwd=workdir)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_rejects_non_positive_thumbnail_count(workdir):
     result = subprocess.run(
         [sys.executable, str(GALLERY_SCRIPT), "-N", "0", "-C"],

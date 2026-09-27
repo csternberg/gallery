@@ -38,7 +38,8 @@ Every short switch accepts either case (`-n` and `-N` are equivalent) unless not
 | `-X px` | | Total gallery width in pixels. If only `-X` or only `-Y` is given, the other dimension follows the frames' aspect ratio; giving both stretches the frames non-proportionally |
 | `-Y px` | | Total gallery height in pixels |
 | `-F` | | Also save the individual (resized) thumbnails to a `<name>_thumbs/` folder |
-| `-M` | | Add a metadata header (filename, duration, resolution, codecs, bitrate) above the grid. Its text scales up automatically on wide galleries so it stays readable |
+| `-M` | | Add a metadata header (filename, duration, resolution, codecs, bitrate) above the grid |
+| `-S` | | Scale the `-M` header's text size up with gallery width, so it stays readable on wide galleries instead of looking tiny. Only valid together with `-M`; fixed-size text (the default) is used otherwise |
 | `-O dir` | `--output dir` | Save each gallery (and its `-F` thumbnails) in `dir` instead of next to the source video |
 | `-L` | | Write one full run log to `gallery.log`, in the folder `gallery.py` was run from (not `-O`'s folder). One error log (`gallery_errors.log`) is written there automatically any time a problem occurs, whether or not `-L` was given |
 | `-j n` | `--jobs n` | Parallel `ffmpeg` processes per video (default: `min(8, CPU count)`) |
@@ -56,6 +57,9 @@ python3 gallery.py -M -F clip.mp4
 
 # 24 thumbnails, 1600px wide, everything collected in ./galleries
 python3 gallery.py -R -N 24 -X 1600 -O galleries
+
+# Wide gallery with a metadata header that scales up so it's still legible
+python3 gallery.py -M -S -X 1920 clip.mp4
 
 # Full run log plus a wide gallery
 python3 gallery.py -C -L -X 1920 -M

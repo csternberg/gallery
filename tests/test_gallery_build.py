@@ -56,6 +56,33 @@ def test_make_gallery_with_metadata_adds_header_only(media_dir, tmp_path):
 
 
 @requires_ffmpeg
+def test_make_gallery_metadata_header_is_fixed_size_by_default(media_dir, tmp_path):
+    # scale_text defaults to False (-S not given): header height shouldn't grow
+    # with gallery width. total_y is given explicitly so the frame area's height
+    # is identical between runs and any extra height is purely the header.
+    thumbs, info = _thumbs(media_dir, tmp_path)
+    narrow = gallery.make_gallery(
+        thumbs, tmp_path / "narrow.jpg", total_x=320, total_y=480, metadata=info["meta"])
+    wide = gallery.make_gallery(
+        thumbs, tmp_path / "wide.jpg", total_x=1600, total_y=480, metadata=info["meta"])
+    expected_header = 2 * 10 + 22 * 6  # fixed pad/line-height regardless of width
+    with Image.open(narrow) as a, Image.open(wide) as b:
+        assert a.size[1] - 480 == b.size[1] - 480 == expected_header
+
+
+@requires_ffmpeg
+def test_make_gallery_scale_text_grows_header_on_wide_gallery(media_dir, tmp_path):
+    thumbs, info = _thumbs(media_dir, tmp_path)
+    unscaled = gallery.make_gallery(
+        thumbs, tmp_path / "unscaled.jpg", total_x=1600, metadata=info["meta"], scale_text=False)
+    scaled = gallery.make_gallery(
+        thumbs, tmp_path / "scaled.jpg", total_x=1600, metadata=info["meta"], scale_text=True)
+    with Image.open(unscaled) as a, Image.open(scaled) as b:
+        assert a.size[0] == b.size[0] == 1600
+        assert b.size[1] > a.size[1]
+
+
+@requires_ffmpeg
 def test_make_gallery_saves_individual_resized_thumbs(media_dir, tmp_path):
     thumbs, _ = _thumbs(media_dir, tmp_path)
     thumbs_dir = tmp_path / "saved_thumbs"

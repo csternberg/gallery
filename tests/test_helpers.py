@@ -30,14 +30,19 @@ def test_is_potential_video():
     assert not gallery.is_potential_video(Path("videos.lst"))
 
 
-def test_metadata_layout_floors_at_original_fixed_values():
-    # A narrow gallery keeps the pre-scaling defaults (16px font / 22px line / 10px pad).
+def test_metadata_layout_defaults_to_fixed_size_regardless_of_width():
+    # -S not given: always the original fixed values (16px font / 22px line / 10px pad).
     assert gallery.metadata_layout(320) == (16, 22, 10)
+    assert gallery.metadata_layout(1600) == (16, 22, 10)
 
 
-def test_metadata_layout_scales_up_with_width():
-    small = gallery.metadata_layout(320)
-    wide = gallery.metadata_layout(1600)
+def test_metadata_layout_scale_true_floors_at_fixed_values():
+    assert gallery.metadata_layout(320, scale=True) == (16, 22, 10)
+
+
+def test_metadata_layout_scale_true_scales_up_with_width():
+    small = gallery.metadata_layout(320, scale=True)
+    wide = gallery.metadata_layout(1600, scale=True)
     assert wide[0] > small[0]  # font size
     assert wide[1] > small[1]  # line height
     assert wide[2] > small[2]  # padding
