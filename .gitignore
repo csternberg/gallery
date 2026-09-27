@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+.claude/
 
 # gallery.py's own generated output, if ever run from the repo root
 *_gallery.jpg
