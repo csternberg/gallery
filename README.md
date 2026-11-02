@@ -33,7 +33,7 @@ Every short switch accepts either case (`-n` and `-N` are equivalent) unless not
 | Switch | Long form | Description |
 |---|---|---|
 | `-C` | | Process every video file in the current folder |
-| `-R` | | Recurse into subfolders (everything under the cwd if no files/patterns are given, otherwise turns any patterns into recursive globs) |
+| `-R` | | Recurse into subfolders (everything under the cwd if no files/patterns are given, otherwise turns any patterns into recursive globs). Trash and system folders (`$RECYCLE.BIN`, `System Volume Information`, `.Trash*`, ...) are skipped silently |
 | `-N n` | | Number of thumbnails per video (default: 16) |
 | `-X px` | | Total gallery width in pixels. If only `-X` or only `-Y` is given, the other dimension follows the frames' aspect ratio; giving both stretches the frames non-proportionally |
 | `-Y px` | | Total gallery height in pixels |

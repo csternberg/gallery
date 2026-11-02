@@ -18,7 +18,24 @@ except ImportError:
     sys.exit(1)
 
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
+
+SKIP_DIRS = {"$recycle.bin", "recycler", "system volume information", ".trashes"}
+
+
+def is_trash_dir(name):
+    """Trash and system folders are never scanned (silently), at any depth."""
+    low = name.lower()
+    return low in SKIP_DIRS or low.startswith(".trash")
+
+
+def in_trash_dir(path):
+    """True if path lies inside a trash/system folder below the current folder."""
+    try:
+        parts = os.path.relpath(path).split(os.sep)[:-1]
+    except ValueError:          # other drive on Windows
+        return False
+    return any(is_trash_dir(p) for p in parts)
 
 
 # ------------------------------------------------------------
@@ -356,6 +373,8 @@ def find_videos(patterns, recursive=False):
         for f in sorted(matched):
             p = Path(f)
             if not p.is_file() or not is_potential_video(p):
+                continue
+            if recursive and in_trash_dir(p):
                 continue
             key = p.resolve()
             if key not in seen:
