@@ -2,6 +2,7 @@
 import os
 import sys
 import glob
+import re
 import json
 import math
 import shutil
@@ -18,7 +19,7 @@ except ImportError:
     sys.exit(1)
 
 
-VERSION = "1.1.1"
+VERSION = "1.2.0"
 
 SKIP_DIRS = {"$recycle.bin", "recycler", "system volume information", ".trashes"}
 
@@ -152,11 +153,14 @@ def _to_float(value):
     return f if math.isfinite(f) and f > 0 else None
 
 
-def probe_video(path: Path):
+def probe_video(path: Path, unreadable: list = None):
     """
     Inspect a file with a single ffprobe call.
     Returns None if the file has no real video stream (or ffprobe fails),
     otherwise a dict with the stream index, duration (seconds) and display metadata.
+    When ffprobe itself fails (the file is not readable as media at all), its message
+    is appended to `unreadable` if given, so callers can tell that apart from a
+    readable file that simply has no video.
     """
     try:
         res = subprocess.run(
@@ -168,6 +172,8 @@ def probe_video(path: Path):
             capture_output=True, text=True, errors="replace"
         )
         if res.returncode != 0:
+            if unreadable is not None:
+                unreadable.append(res.stderr.strip() or f"ffprobe exited with {res.returncode}")
             return None
         data = json.loads(res.stdout or "{}")
     except (OSError, ValueError):
@@ -255,6 +261,32 @@ FONT_CANDIDATES = [
     "/Library/Fonts/Arial.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
 ]
+
+_ADDRESS = re.compile(r"\[[^\]@]*@ [0-9a-fA-Fx]+\]\s*")
+_DAMAGE_HINTS = ("Invalid NAL unit", "missing picture", "Error splitting", "Invalid data found",
+                 "Error submitting packet", "moov atom not found", "corrupt", "truncated")
+
+
+def summarize_frame_errors(name: str, errors: list, wanted: int, made: int) -> str:
+    """
+    One-line summary of failed frame extractions, instead of ffmpeg's full stderr
+    (which can run to many thousands of lines for a truncated file).
+    """
+    failed = wanted - made
+    text = "\n".join(errors)
+    if any(h in text for h in _DAMAGE_HINTS):
+        cause = "damaged or truncated video data"
+    elif "no frame produced" in text:
+        cause = "no frame at the requested positions (file shorter than its header says)"
+    else:
+        first = next((ln for ln in text.splitlines() if ln.strip()), "unknown error")
+        first = re.sub(r"^frame \d+:\s*", "", first)
+        cause = _ADDRESS.sub("", first)[:120]
+    action = (f"gallery built from the {made} readable frame(s)" if made
+              else "no gallery made")
+    return (f"[ERROR] {name}: {cause}; {failed} of {wanted} frames could not be "
+            f"extracted, {action}")
+
 
 def load_font(size: int):
     for name in FONT_CANDIDATES:
@@ -419,6 +451,8 @@ def main():
                         help="Write one full run log (gallery.log) in the folder gallery.py was run from. "
                              "One error log (gallery_errors.log) is always written there too if any "
                              "problems occur")
+    parser.add_argument("--verbose", action="store_true",
+                        help="Log the full ffmpeg/ffprobe error messages instead of a short summary")
     parser.add_argument("-j", "-J", "--jobs", type=positive_int, default=min(8, os.cpu_count() or 4),
                         help="Parallel ffmpeg processes per video (default: %(default)s)")
 
@@ -452,9 +486,15 @@ def main():
         try:
             progress.start(n, len(files), video.name)
 
-            info = probe_video(video)
+            unreadable = []
+            info = probe_video(video, unreadable)
             if info is None:
-                progress.log(f"[SKIP] Not a video file: {video}")
+                if unreadable:
+                    progress.log(f"[WARN] {video.name} file found: Not a valid video file ({video})")
+                    if args.verbose:
+                        progress.log(f"[WARN] {video.name}: {unreadable[0]}")
+                else:
+                    progress.log(f"[SKIP] Not a video file: {video}")
                 continue
             if info["duration"] is None:
                 progress.log(f"[ERROR] Could not get duration for {video}")
@@ -465,8 +505,13 @@ def main():
                 thumbs, errors = extract_thumbnails(
                     video, info["index"], info["duration"], args.N, Path(tmpdir), args.jobs, progress
                 )
-                for err in errors:
-                    progress.log(f"[ERROR] {video.name}: {err}")
+                if errors:
+                    summary_line = summarize_frame_errors(video.name, errors, args.N, len(thumbs))
+                    progress.log(summary_line if args.verbose
+                                 else f"{summary_line} (--verbose logs the full ffmpeg messages)")
+                    if args.verbose:
+                        for err in errors:
+                            progress.log(f"[ERROR] {video.name}: {err}")
 
                 if not thumbs:
                     progress.log(f"[WARN] No thumbnails to make gallery for {video}")

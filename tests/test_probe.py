@@ -39,7 +39,9 @@ def test_probe_video_audio_only_no_video_stream(media_dir):
 
 @requires_ffmpeg
 def test_probe_video_corrupt_file_returns_none(media_dir):
-    assert gallery.probe_video(media_dir / "corrupt.mp4") is None
+    unreadable = []
+    assert gallery.probe_video(media_dir / "corrupt.mp4", unreadable) is None
+    assert unreadable          # ffprobe's own failure is reported to the caller
 
 
 @requires_ffmpeg

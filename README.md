@@ -43,6 +43,7 @@ Every short switch accepts either case (`-n` and `-N` are equivalent) unless not
 | `-O dir` | `--output dir` | Save each gallery (and its `-F` thumbnails) in `dir` instead of next to the source video |
 | `-L` | | Write one full run log to `gallery.log`, in the folder `gallery.py` was run from (not `-O`'s folder). One error log (`gallery_errors.log`) is written there automatically any time a problem occurs, whether or not `-L` was given |
 | `-j n` | `--jobs n` | Parallel `ffmpeg` processes per video (default: `min(8, CPU count)`) |
+| | `--verbose` | Log the full `ffmpeg`/`ffprobe` error messages. Without it the error log gets a short summary per problem file (e.g. "damaged or truncated video data; 12 of 16 frames could not be extracted") or "file found: Not a valid video file" for files that cannot be read as media at all |
 | `-V` | `--version` | Print the version and exit |
 | `-h` | `--help` | Show the full help message and exit |
 

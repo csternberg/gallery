@@ -35,8 +35,36 @@ def test_corrupt_file_is_skipped_not_a_failure(media_dir, workdir):
     copy_fixture(media_dir, "corrupt.mp4", workdir)
     result = run_gallery(["corrupt.mp4"], cwd=workdir)
     assert result.returncode == 0
-    assert "[SKIP]" in result.stdout
+    assert "Not a valid video file" in result.stdout
     assert not (workdir / "corrupt_gallery.jpg").exists()
+    error_log = (workdir / "gallery_errors.log").read_text(encoding="utf-8")
+    assert "corrupt.mp4 file found: Not a valid video file" in error_log
+
+
+@requires_ffmpeg
+def test_corrupt_file_verbose_logs_ffprobe_message(media_dir, workdir):
+    copy_fixture(media_dir, "corrupt.mp4", workdir)
+    result = run_gallery(["--verbose", "corrupt.mp4"], cwd=workdir)
+    assert result.returncode == 0
+    error_log = (workdir / "gallery_errors.log").read_text(encoding="utf-8")
+    assert "Not a valid video file" in error_log
+    assert len(error_log.splitlines()) > 1      # ffprobe's own message follows
+
+
+def test_summarize_frame_errors_is_short_and_names_cause():
+    errors = [f"frame {i}: [h264 @ 0000018d8c07ff40] Invalid NAL unit size (1 > 2).\n"
+              + "[h264 @ 0000018d8c07ff40] missing picture in access unit\n" * 500
+              for i in range(5, 17)]
+    line = gallery.summarize_frame_errors("a.mp4", errors, wanted=16, made=4)
+    assert "\n" not in line
+    assert "damaged or truncated" in line
+    assert "12 of 16" in line and "4 readable" in line
+    assert "0000018d" not in line
+
+
+def test_summarize_frame_errors_without_any_frame():
+    line = gallery.summarize_frame_errors("a.mp4", ["frame 1: no frame produced"], 1, 0)
+    assert "no gallery made" in line
 
 
 @requires_ffmpeg
@@ -259,9 +287,10 @@ def test_exactly_one_log_and_one_error_log_per_run(media_dir, workdir):
     copy_fixture(media_dir, "corrupt.mp4", workdir, dest_name="c.mp4")
     result = run_gallery(["-N", "2", "-L", "-C"], cwd=workdir)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert len(list(workdir.glob("gallery*.log"))) == 1
-    # A skipped non-video file is not an error, so no error log should appear here.
-    assert not (workdir / "gallery_errors.log").exists()
+    assert len(list(workdir.glob("gallery.log"))) == 1
+    # The unreadable file is reported once, in the single error log.
+    assert len(list(workdir.glob("gallery_errors*.log"))) == 1
+    assert "c.mp4 file found: Not a valid video file" in (workdir / "gallery_errors.log").read_text(encoding="utf-8")
 
 
 def test_dot_log_files_are_not_picked_up_as_videos(workdir):
